@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Die Zugbrücken-Belagerung - Ritter der Tafelrunde VI</title>
+    <style>
+        /* --- GLOBAL VARIABLES & THEME --- */
+        :root {
+            --gold: #f1c40f;
+            --stone-top: #95a5a6;
+            --stone-side: #34495e;
+            
+            --red-bridge: #e74c3c;
+            --blue-bridge: #3498db;
+            --green-bridge: #2ecc71;
+        }
+
+        body {
+            margin: 0; padding: 0; font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+            background: radial-gradient(circle at 50% 40%, #1c2833 0%, #080b0e 80%);
+            color: #ecf0f1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; height: 100vh; overflow: hidden;
+            user-select: none; touch-action: manipulation;
+        }
+
+        /* --- AUDIO MUTE BUTTON --- */
+        #mute-btn {
+            position: absolute; top: 15px; right: 15px; z-index: 1000;
+            background: rgba(0,0,0,0.8); color: var(--gold); border: 2px solid var(--gold);
+            border-radius: 30px; padding: 8px 15px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.8); transition: all 0.2s;
+        }
+        #mute-btn:active { transform: translateY(2px); }
+
+        /* --- SCREENS --- */
+        .screen {
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            width: 100%; height: 100%; position: absolute; top:0; left:0; z-index: 10;
+        }
+        .screen.active { display: flex; }
+
+        /* --- AVATAR & TITEL --- */
+        .avatar-img { 
+            width: 110px; height: auto; border-radius: 8px; border: 3px solid #f1c40f; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9); margin-bottom: 5px; 
+            background-color: #fff; padding: 3px; transform: rotate(-2deg);
+        }
+        h1.title { 
+            color: var(--gold); font-size: 30px; margin-bottom: 5px; text-transform: uppercase; 
+            letter-spacing: 3px; font-weight: 900; text-shadow: 0 5px 15px rgba(0,0,0,0.9); text-align: center; line-height: 1.1;
+        }
+        h3.subtitle { color: #bdc3c7; font-size: 15px; margin-top: 0; letter-spacing: 5px; font-weight: bold;}
+
+        /* --- BUTTONS --- */
+        .btn {
+            background: linear-gradient(180deg, #f39c12 0%, #d35400 100%); color: #fff;
+            border: 2px solid #a04000; padding: 12px 30px; font-size: 18px; font-weight: bold;
+            border-radius: 8px; cursor: pointer; text-transform: uppercase; margin-top: 15px;
+            box-shadow: 0 6px 0 #873600, 0 10px 15px rgba(0,0,0,0.8); transition: all 0.1s; letter-spacing: 2px;
+        }
+        .btn:active { transform: translateY(6px); box-shadow: 0 0 0 #873600; }
+        .btn-nav { background: linear-gradient(180deg, #34495e 0%, #2c3e50 100%); border-color: #1c2833; box-shadow: 0 6px 0 #151d26; margin: 10px;}
+
+        /* --- RULES CARDS --- */
+        .rule-card {
+            background: rgba(15, 15, 20, 0.95); border: 3px solid var(--gold); padding: 25px;
+            border-radius: 12px; text-align: center; max-width: 500px; box-shadow: 0 15px 30px rgba(0,0,0,0.9);
+        }
+        .rule-card h2 { margin-top: 0; font-size: 24px; color: var(--gold); }
+        .rule-card p { font-size: 14px; line-height: 1.5; margin-bottom: 12px; color: #ecf0f1; font-family: sans-serif;}
+        
+        .logic-box { background: #000; padding: 12px; border-radius: 8px; border: 1px solid #444; margin-bottom: 15px; text-align: center; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; gap: 8px;}
+        .demo-tiles { display: flex; gap: 15px; justify-content: center; margin-bottom: 5px; }
+
+        /* --- GAME AREA (8x8 3D GRID) --- */
+        #game-screen { justify-content: flex-start; padding-top: 20px; }
+        #game-header { width: 100%; max-width: 360px; display: flex; justify-content: flex-end; margin-bottom: 8px; }
+
+        #grid-container {
+            display: grid;
+            /* 8 Spalten, 40px Kacheln -> passt perfekt auf alle modernen Handys */
+            grid-template-columns: repeat(8, 40px);
+            grid-template-rows: repeat(8, 40px);
+            gap: 4px; padding: 10px;
+            background: #050505; border-radius: 12px;
+            border: 6px ridge #3e2723;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.9), inset 0 0 30px #000;
+            position: relative;
+        }
+
+        /* DIE KACHELN (3D Effekt) */
+        .tile {
+            width: 40px; height: 40px; border-radius: 5px;
+            position: relative; cursor: pointer;
+            display: flex; justify-content: center; align-items: center; flex-direction: column;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-sizing: border-box;
+        }
+
+        .tile.water {
+            background: linear-gradient(135deg, #0b5345 0%, #062b23 100%);
+            box-shadow: inset 0 0 12px rgba(0,0,0,0.9);
+            transform: translateY(0);
+            border: 1px solid #041a15;
+            opacity: 0.9;
+        }
+
+        .tile.stone {
+            background: var(--stone-top);
+            box-shadow: 0 6px 0 var(--stone-side), 0 10px 12px rgba(0,0,0,0.8);
+            transform: translateY(-6px);
+            border: 1px solid #bdc3c7;
+        }
+
+        .tile.target {
+            background: linear-gradient(135deg, #f1c40f, #d35400);
+            box-shadow: 0 6px 0 #873600, 0 0 15px rgba(241,196,15,0.6);
+            transform: translateY(-6px);
+            border: 2px solid #fff;
+        }
+        .tile.target::after { content: '🏰'; font-size: 22px; }
+
+        /* ZWEIFARBIGE SCHALTER-STEINE */
+        .tile.switch {
+            box-shadow: 0 6px 0 var(--stone-side), 0 10px 12px rgba(0,0,0,0.8);
+            transform: translateY(-6px);
+            border: 2px solid #fff;
+        }
+        .tile.switch.red-blue { background: linear-gradient(135deg, var(--red-bridge) 50%, var(--blue-bridge) 50%); }
+        .tile.switch.blue-green { background: linear-gradient(135deg, var(--blue-bridge) 50%, var(--green-bridge) 50%); }
+        .tile.switch.green-red { background: linear-gradient(135deg, var(--green-bridge) 50%, var(--red-bridge) 50%); }
+
+        .switch-center {
+            width: 14px; height: 14px;
+            background: #ecf0f1; border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.8), inset 0 -2px 3px rgba(0,0,0,0.2);
+            border: 2px solid #333;
+        }
+
+        /* Brücken */
+        .tile.bridge { border: 2px solid rgba(255,255,255,0.2); }
+        .tile.bridge.up { transform: translateY(-6px); opacity: 1; z-index: 2; }
+        .tile.bridge.red.up { background: var(--red-bridge); box-shadow: 0 6px 0 #922b21, 0 10px 12px rgba(0,0,0,0.8); }
+        .tile.bridge.blue.up { background: var(--blue-bridge); box-shadow: 0 6px 0 #154360, 0 10px 12px rgba(0,0,0,0.8); }
+        .tile.bridge.green.up { background: var(--green-bridge); box-shadow: 0 6px 0 #145a32, 0 10px 12px rgba(0,0,0,0.8); }
+
+        .tile.bridge.down { transform: translateY(2px); opacity: 0.3; box-shadow: inset 0 0 15px #000; z-index: 1; }
+        .tile.bridge.red.down { background: #641e16; border-color: var(--red-bridge); }
+        .tile.bridge.blue.down { background: #154360; border-color: var(--blue-bridge); }
+        .tile.bridge.green.down { background: #145a32; border-color: var(--green-bridge); }
+
+        /* --- PLAYER & SPRUNG ANIMATION --- */
+        #player-wrapper {
+            position: absolute; width: 40px; height: 40px;
+            display: flex; justify-content: center; align-items: center;
+            transition: left 0.3s linear, top 0.3s linear;
+            z-index: 50; pointer-events: none;
+        }
+        
+        #player-sprite {
+            width: 26px; height: 26px; 
+            background: radial-gradient(circle, #f1c40f 0%, #d35400 100%);
+            border: 2px solid #fff; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; font-size: 14px;
+            box-shadow: 0 12px 15px rgba(0,0,0,0.9), inset 0 0 6px #fff;
+            transform: translateY(-10px);
+        }
+
+        .jumping #player-sprite { animation: jumpArc 0.3s cubic-bezier(0.25, 1, 0.5, 1); }
+
+        @keyframes jumpArc {
+            0% { transform: translateY(-10px) scale(1); }
+            50% { transform: translateY(-30px) scale(1.15); box-shadow: 0 20px 20px rgba(0,0,0,0.5); }
+            100% { transform: translateY(-10px) scale(1); }
+        }
+
+        /* --- MASSIVES 3D STEUERKREUZ (D-PAD) --- */
+        #dpad {
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+            margin-top: 20px; z-index: 50;
+        }
+        .dpad-row { display: flex; gap: 8px; }
+        .dpad-btn {
+            background: linear-gradient(180deg, #3498db 0%, #2980b9 100%);
+            border: 2px solid #1c5980; border-radius: 10px;
+            width: 60px; height: 60px; color: #fff; font-size: 26px;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 6px 0 #154360, 0 12px 15px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.4);
+            cursor: pointer; user-select: none; transition: transform 0.1s, box-shadow 0.1s, background 0.1s;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .dpad-btn:active { 
+            transform: translateY(6px); 
+            box-shadow: 0 0 0 #154360, 0 4px 6px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.2); 
+            background: #2980b9;
+        }
+
+        /* --- OVERLAY (WIN) --- */
+        #overlay {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(5,4,6,0.94); display: none; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 100; padding: 20px; box-sizing: border-box; backdrop-filter: blur(8px);
+        }
+        .msg-box {
+            background: linear-gradient(180deg, #1e1b24 0%, #0d0b12 100%); 
+            padding: 40px; border-radius: 10px; border: 4px solid var(--gold);
+            text-align: center; max-width: 500px; width: 100%; box-shadow: 0 0 70px rgba(241,196,15,0.3);
+        }
+        #message { font-size: 30px; margin-bottom: 15px; font-weight: 900; color: var(--gold); text-shadow: 0 4px 10px #000; letter-spacing: 2px;}
+        .coords-display { background: #000; color: #2ecc71; padding: 18px; font-family: monospace; font-size: 22px; border-radius: 6px; letter-spacing: 3px; margin-bottom: 25px; display: none; border: 2px solid #555; text-shadow: 0 0 10px #2ecc71; box-shadow: inset 0 0 15px rgba(46, 204, 113, 0.2); }
+    </style>
+</head>
+<body>
+
+    <audio id="bg-music" loop preload="auto"><source src="musik.mp3" type="audio/mpeg"></audio>
+    <button id="mute-btn" onclick="toggleMusic()">🔈 Musik AUS</button>
+
+    <!-- START SCREEN -->
+    <div id="start-screen" class="screen active">
+        <img src="watermarked_img_6903407468286738764.png" alt="Avatar" class="avatar-img" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><rect width=\'100\' height=\'100\' fill=\'%23ccc\'/><text x=\'50\' y=\'65\' font-size=\'40\' text-anchor=\'middle\' fill=\'white\'>VI</text></svg>'">
+        <h1 class="title">Die Brücken<br>Belagerung</h1>
+        <h3 class="subtitle">RITTER DER TAFELRUNDE VI</h3>
+        <button class="btn" onclick="initMusicAndContinue()">Mission Starten</button>
+    </div>
+
+    <!-- RULES -->
+    <div id="rules-1" class="screen">
+        <div class="rule-card">
+            <h2>Die Zweifarbigen Schalter</h2>
+            <p>Führe deinen Ritter 🛡️ sicher über den tiefen See zum Burgtor 🏰. Im Wasser liegen schwere Zugbrücken, die du nur überqueren kannst, wenn sie erhoben sind.</p>
+            
+            <div class="logic-box">
+                <div class="demo-tiles">
+                    <div class="tile switch red-blue" style="width:36px;height:36px;transform:none;box-shadow:none;"><div class="switch-center"></div></div>
+                    <div class="tile switch blue-green" style="width:36px;height:36px;transform:none;box-shadow:none;"><div class="switch-center"></div></div>
+                    <div class="tile switch green-red" style="width:36px;height:36px;transform:none;box-shadow:none;"><div class="switch-center"></div></div>
+                </div>
+                <b>Die Eiserne Regel:</b><br>
+                Ein Schalterstein hebt (oder senkt!) immer exakt die <b>beiden Brückenfarben</b>, in denen er bemalt ist!
+            </div>
+            
+            <p style="font-size: 13px; color: #bdc3c7;">Start: Rot und Blau ragen aus dem Wasser. Grün ist versunken.<br>Tipp: Nutze das Steuerkreuz oder tippe auf ein Feld, um zu springen. Vorsicht vor Sackgassen!</p>
+
+            <div>
+                <button class="btn btn-nav" onclick="showScreen('start-screen')">Zurück</button>
+                <button class="btn btn-nav" style="background: #27ae60; border-color:#145a32;" onclick="startGame()">Ich bin bereit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div id="game-screen" class="screen">
+        <div id="game-header">
+            <button class="btn btn-nav" style="margin:0; padding: 6px 14px; font-size: 14px;" onclick="resetGame()">↺ Neustart</button>
+        </div>
+
+        <div id="grid-container">
+            <!-- 64 Kacheln per JS generiert -->
+            <div id="player-wrapper"><div id="player-sprite">🛡️</div></div>
+        </div>
+
+        <!-- 3D STEUERKREUZ -->
+        <div id="dpad">
+            <div class="dpad-btn" onclick="moveDir(-1, 0)">▲</div>
+            <div class="dpad-row">
+                <div class="dpad-btn" onclick="moveDir(0, -1)">◀</div>
+                <div class="dpad-btn" onclick="moveDir(1, 0)">▼</div>
+                <div class="dpad-btn" onclick="moveDir(0, 1)">▶</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERLAY (WIN) -->
+    <div id="overlay">
+        <div class="msg-box">
+            <div id="message">TOR ERREICHT!</div>
+            <p style="color: #ecf0f1; margin-bottom: 25px; line-height: 1.5; font-family: sans-serif;">Der Wahnsinn! Du hast das extrem komplexe Labyrinth durchschaut und die Burg erobert. Ein echtes Meisterwerk der Logik!</p>
+            <div id="final-coords" class="coords-display"></div>
+            <button class="btn" onclick="resetGame()">Nochmal Spielen</button>
+        </div>
+    </div>
+
+    <script>
+        let musicPlaying = false;
+        let bgMusic = document.getElementById('bg-music');
+        bgMusic.volume = 0.5; 
+
+        function toggleMusic() {
+            if(musicPlaying) { bgMusic.pause(); document.getElementById('mute-btn').innerText = "🔈 Musik AUS"; musicPlaying = false; }
+            else { bgMusic.play().catch(e=>0); document.getElementById('mute-btn').innerText = "🔊 Musik AN"; musicPlaying = true; }
+        }
+
+        function initMusicAndContinue() {
+            if(!musicPlaying) { bgMusic.play().then(() => { musicPlaying = true; document.getElementById('mute-btn').innerText = "🔊 Musik AN"; }).catch(e=>0); }
+            showScreen('rules-1');
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // DEINE GEHEIMEN KOORDINATEN
+        const SECRET_COORDS = "TjUwwrAgMTkuNDUwJyBFMDEywrAgMDQuMjAwJw==";
+
+        /*
+            D5 - HARDCORE MAP LAYOUT (8x8)
+            S = Stein (Erhoben)
+            W = Tiefes Wasser (Nicht passierbar)
+            T = Ziel
+            St = Start
+            B_R, B_B, B_G = Brücken (Rot, Blau, Grün)
+            S_RB, S_BG, S_GR = Zweifarbige Schaltersteine
+        */
+        const layoutMap = [
+            ['S_BG', 'B_G',  'S_GR', 'W',    'S_RB', 'B_B',  'B_R',  'T'   ],
+            ['B_R',  'W',    'B_R',  'W',    'B_G',  'W',    'W',    'B_B' ],
+            ['S_GR', 'B_B',  'S_RB', 'B_G',  'S_BG', 'B_R',  'S_GR', 'S_RB'],
+            ['B_G',  'W',    'W',    'W',    'B_R',  'W',    'B_B',  'W'   ],
+            ['S_RB', 'B_R',  'S_BG', 'W',    'S_GR', 'B_G',  'S_RB', 'B_G' ],
+            ['B_B',  'W',    'B_B',  'W',    'B_R',  'W',    'W',    'B_R' ],
+            ['S_GR', 'B_G',  'S_RB', 'B_R',  'S_BG', 'B_B',  'S_GR', 'S_BG'],
+            ['St',   'W',    'W',    'W',    'W',    'W',    'B_R',  'W'   ]
+        ];
+
+        // Start bei 7,0 (Unten Links)
+        let playerPos = { r: 7, c: 0 }; 
+        // Start Zustand: Rot und Blau erhoben, Grün versunken
+        let bridgeStates = { R: true, B: true, G: false };
+        let isGameWon = false;
+        let isMoving = false;
+
+        function startGame() {
+            showScreen('game-screen');
+            resetGame();
+        }
+
+        function resetGame() {
+            playerPos = { r: 7, c: 0 };
+            bridgeStates = { R: true, B: true, G: false };
+            isGameWon = false;
+            isMoving = false;
+            document.getElementById('overlay').style.display = 'none';
+            renderBoard();
+            
+            setTimeout(() => { updatePlayerVisuals(false); }, 50);
+        }
+
+        function renderBoard() {
+            const container = document.getElementById('grid-container');
+            Array.from(container.children).forEach(child => { if(child.id !== 'player-wrapper') child.remove(); });
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const type = layoutMap[r][c];
+                    const tile = document.createElement('div');
+                    tile.className = 'tile';
+                    tile.id = `tile-${r}-${c}`;
+
+                    if (type === 'S' || type === 'St') tile.classList.add('stone');
+                    else if (type === 'W') tile.classList.add('water');
+                    else if (type === 'T') tile.classList.add('target');
+                    else if (type.startsWith('S_')) {
+                        tile.classList.add('switch');
+                        if (type === 'S_RB') tile.classList.add('red-blue');
+                        if (type === 'S_BG') tile.classList.add('blue-green');
+                        if (type === 'S_GR') tile.classList.add('green-red');
+                        tile.innerHTML = '<div class="switch-center"></div>';
+                    }
+                    else if (type.startsWith('B_')) {
+                        tile.classList.add('bridge');
+                        if (type === 'B_R') { tile.classList.add('red'); tile.classList.add(bridgeStates.R ? 'up' : 'down'); }
+                        if (type === 'B_B') { tile.classList.add('blue'); tile.classList.add(bridgeStates.B ? 'up' : 'down'); }
+                        if (type === 'B_G') { tile.classList.add('green'); tile.classList.add(bridgeStates.G ? 'up' : 'down'); }
+                    }
+
+                    tile.onclick = () => tryMoveTo(r, c);
+                    container.insertBefore(tile, document.getElementById('player-wrapper'));
+                }
+            }
+        }
+
+        function updateBridgesVisuals() {
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const type = layoutMap[r][c];
+                    if (type.startsWith('B_')) {
+                        const tile = document.getElementById(`tile-${r}-${c}`);
+                        tile.classList.remove('up', 'down');
+                        if (type === 'B_R') tile.classList.add(bridgeStates.R ? 'up' : 'down');
+                        if (type === 'B_B') tile.classList.add(bridgeStates.B ? 'up' : 'down');
+                        if (type === 'B_G') tile.classList.add(bridgeStates.G ? 'up' : 'down');
+                    }
+                }
+            }
+        }
+
+        function updatePlayerVisuals(animateJump) {
+            const wrapper = document.getElementById('player-wrapper');
+            const targetTile = document.getElementById(`tile-${playerPos.r}-${playerPos.c}`);
+            
+            wrapper.style.left = `${targetTile.offsetLeft}px`;
+            wrapper.style.top = `${targetTile.offsetTop}px`;
+
+            if (animateJump) {
+                isMoving = true;
+                wrapper.classList.add('jumping');
+                setTimeout(() => {
+                    wrapper.classList.remove('jumping');
+                    isMoving = false;
+                    checkWinCondition();
+                }, 300); 
+            }
+        }
+
+        // Steuerung über D-Pad Buttons
+        function moveDir(dr, dc) {
+            const newR = playerPos.r + dr;
+            const newC = playerPos.c + dc;
+            // Begrenzung auf 8x8 Grid
+            if (newR >= 0 && newR < 8 && newC >= 0 && newC < 8) {
+                tryMoveTo(newR, newC);
+            }
+        }
+
+        function tryMoveTo(r, c) {
+            if (isGameWon || isMoving) return;
+
+            const distR = Math.abs(r - playerPos.r);
+            const distC = Math.abs(c - playerPos.c);
+
+            // Nur orthogonale Bewegungen um exakt 1 Feld
+            if ((distR === 1 && distC === 0) || (distR === 0 && distC === 1)) {
+                const targetType = layoutMap[r][c];
+
+                // Darf das Feld betreten werden?
+                let canWalk = false;
+                if (targetType === 'S' || targetType === 'St' || targetType === 'T' || targetType.startsWith('S_')) {
+                    canWalk = true;
+                } else if (targetType === 'B_R' && bridgeStates.R) canWalk = true;
+                else if (targetType === 'B_B' && bridgeStates.B) canWalk = true;
+                else if (targetType === 'B_G' && bridgeStates.G) canWalk = true;
+
+                if (canWalk) {
+                    playerPos = { r, c };
+                    updatePlayerVisuals(true);
+
+                    // Kopplungsmagie
+                    if (targetType === 'S_RB') {
+                        bridgeStates.R = !bridgeStates.R;
+                        bridgeStates.B = !bridgeStates.B;
+                        setTimeout(updateBridgesVisuals, 150);
+                    } else if (targetType === 'S_BG') {
+                        bridgeStates.B = !bridgeStates.B;
+                        bridgeStates.G = !bridgeStates.G;
+                        setTimeout(updateBridgesVisuals, 150);
+                    } else if (targetType === 'S_GR') {
+                        bridgeStates.G = !bridgeStates.G;
+                        bridgeStates.R = !bridgeStates.R;
+                        setTimeout(updateBridgesVisuals, 150);
+                    }
+                }
+            }
+        }
+
+        function checkWinCondition() {
+            if (layoutMap[playerPos.r][playerPos.c] === 'T') {
+                isGameWon = true;
+                setTimeout(() => {
+                    const coordsEl = document.getElementById('final-coords');
+                    coordsEl.innerText = decodeURIComponent(escape(window.atob(SECRET_COORDS)));
+                    coordsEl.style.display = "block";
+                    document.getElementById('overlay').style.display = "flex";
+                }, 400);
+            }
+        }
+        
+        // Passt die Spielfigur an, wenn sich das Handy-Display dreht
+        window.addEventListener('resize', () => { if(document.getElementById('game-screen').classList.contains('active')) updatePlayerVisuals(false); });
+    </script>
+</body>
+</html>
